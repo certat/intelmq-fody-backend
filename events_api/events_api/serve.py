@@ -509,6 +509,9 @@ def setup(api):
     open_db_connection(config["libpg conninfo"])
     log.debug("Initialised DB connection for events_api.")
 
+    global QUERY_EVENT_SUBQUERY
+    QUERY_EVENT_SUBQUERY.update(config.get('subqueries', {}))
+
 
 @hug.get(ENDPOINT_PREFIX, examples="id=1")
 # @hug.post(ENDPOINT_PREFIX)
