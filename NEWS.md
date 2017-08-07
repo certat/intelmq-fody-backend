@@ -1,7 +1,9 @@
 ## 0.5.2 to 0.5.3 (unreleased)
 
-(TODO)
-
+ * Events: Subqueries can need the parameter '%s' more or less than one time in the SQL query, for example:
+   ```
+   ("source.ip" = '%s' OR "destination.ip" = '%s')
+   ```
 
 ## 0.5.1 to 0.5.2
 
