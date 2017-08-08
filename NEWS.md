@@ -1,16 +1,6 @@
 ## 0.5.2 to 0.5.3 (unreleased)
 
- * Events: Subqueries can be extended by the configuration, for example:
-   ```
-   "subqueries": {
-     "all_ips": {
-       "sql": "(\"source.ip\" = %s OR \"source.local_ip\" = %s OR \"destination.ip\" = %s OR \"destination.local_ip\" = %s)",
-       "description": "Queries (source|destination).(local_)ip",
-       "label": "Query all IPs",
-       "ext_type": "integer"
-     }
-   }
-   ```
+ * Events: Subqueries can be extended by the configuration, see the example configuration.
  * Events: Subqueries can need the parameter '%s' more or less than one time in the SQL query, for example:
    ```
    ("source.ip" = '%s' OR "destination.ip" = '%s')

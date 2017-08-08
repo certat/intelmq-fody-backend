@@ -58,7 +58,15 @@ EXAMPLE_CONF_FILE = r"""
 {
   "libpg conninfo":
     "host=localhost dbname=intelmq-events user=eventapiuser password='USER\\'s DB PASSWORD'",
-  "logging_level": "INFO"
+  "logging_level": "INFO",
+  "subqueries": {
+     "all_ips": {
+       "sql": "(\"source.ip\" = %s OR \"source.local_ip\" = %s OR \"destination.ip\" = %s OR \"destination.local_ip\" = %s)",
+       "description": "Queries (source|destination).(local_)ip",
+       "label": "Query all IPs",
+       "ext_type": "integer"
+     }
+   }
 }
 """
 
