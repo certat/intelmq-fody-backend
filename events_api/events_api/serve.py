@@ -412,18 +412,7 @@ def query_prepare_search(q):
     Returns: A Tuple consisting of a query sting and an array of parameters.
 
     """
-    q_string = "SELECT id , " \
-               " \"time.observation\", " \
-               " \"time.source\", " \
-               " \"source.ip\", " \
-               " \"destination.ip\", " \
-               " \"classification.taxonomy\", " \
-               " \"classification.type\", " \
-               " \"classification.identifier\", " \
-               " \"malware.name\", " \
-               " \"feed.provider\", "\
-               " \"feed.name\" " \
-               " FROM events"  # TODO maybe events should be a variable...
+    q_string = "SELECT * FROM events"  # TODO maybe events should be a variable...
 
     params = []
     # now iterate over q (which had to be created with query_build_query
@@ -455,7 +444,7 @@ def query_prepare_stats(q, interval = 'day'):
     if interval not in ('month', 'week', 'day', 'hour'):
         raise ValueError
 
-    trunc = "date_trunc('%s', \"time.observation\")" % (interval,)
+    trunc = "date_trunc('%s', \"time.source\")" % (interval,)
 
     q_string = "SELECT {}, count(*) FROM events".format(trunc)
 
