@@ -1,11 +1,18 @@
-## 0.6.1 to 0.6.2 (unreleased)
-(TODO)
+## 0.6.2 to 0.6.3 (unreleased)
+**TODO**
+
  * Contactdb:
-   * Adds GET and PUT endpoints for ./email/ and an additional endpointCGET
-    /searchdisabledcontactto to support the seperate email_status table.
+  * Disallows creating CIDRs or FQDNs with the same value in a single contact;
+    only the first will be inserted. If this happens it shows in loglevel INFO.
  * Events:
    * Additional configuration parameter `database table` to set the
      table name of the events table. Default is `events`.
+
+
+## 0.6.1 to 0.6.2
+ * Contactdb:
+   * Adds GET and PUT endpoints for ./email/ and an additional endpoint GET
+    /searchdisabledcontact to support the separate email_status table.
 
 ### Upgrade
  * Requirements: Check that we have postgresql v>=9.5.

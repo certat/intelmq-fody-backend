@@ -430,8 +430,8 @@ def query_prepare_stats(q, interval='day'):
 
     trunc = "date_trunc('%s', \"time.source\")" % (interval,)
 
-    q_string = "SELECT {trunc}, count(*) FROM {table}".format(trunc=trunc,
-                                                              table=QUERY_TABLE_NAME)
+    q_string = """SELECT {trunc}, count(*) FROM {table}
+               """.format(trunc=trunc, table=QUERY_TABLE_NAME)
 
     params = []
     # now iterate over q (which had to be created with query_build_query
@@ -530,10 +530,8 @@ def showSubqueries():
 
     # Remove the SQL Statement from the SQ Object.
     for k, v in subquery_copy.items():
-        try:
+        if 'sql' in v:
             del(v['sql'])
-        except:
-            pass
 
     return subquery_copy
 
