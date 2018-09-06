@@ -6,6 +6,7 @@ Until we do not have an server automatically setup,
 the functions in here must be run manually.
 """
 
+import copy
 import json
 import os
 import urllib.error
@@ -64,12 +65,27 @@ DATA = json.dumps({
               'ti_handle': ''}]}
 )
 
+ORG_TEMPLATE = {
+    'annotations': [],
+    'asns': [],
+    'comment': '',
+    'contacts': [],
+    'first_handle': '',
+    'fqdns': [],
+    'name': 'test_commit.py Contact',
+    'national_certs': [],
+    'networks': [],
+    'ripe_org_hdl': '',
+    'sector_id': None,
+    'ti_handle': ''}
+
 
 def semi_automatic():
     # generic code for an Basic Auth connection
     password_mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
     password_mgr.add_password(realm=None, uri=BASEURL,
-                              user='intelmq', passwd='intelmq')
+                              user=os.getenv('TESTUSER', 'intelmq'),
+                              passwd=os.getenv('TESTPASSWORD', 'intelmq'))
     auth_handler = urllib.request.HTTPBasicAuthHandler(password_mgr)
     opener = urllib.request.build_opener(auth_handler)
     urllib.request.install_opener(opener)
@@ -78,7 +94,7 @@ def semi_automatic():
     request = urllib.request.Request(BASEURL + ENDPOINT)
     request.add_header("Content-Type", "application/json")
 
-    # test1
+    # test1 commits test data
     # print(json.loads(DATA)["orgs"][0])
     f = urllib.request.urlopen(request, DATA.encode('utf-8'))
     result = f.read().decode('utf-8')
@@ -130,6 +146,7 @@ def semi_automatic():
     f = urllib.request.urlopen(request, data_update.encode('utf-8'))
     print(f.read().decode('utf-8'))
 
+    # cleanup
     if not os.getenv("TESTKEEP"):
         # as stuff may have changed, we re-read before deletion
         f = urllib.request.urlopen(request2)
@@ -139,6 +156,24 @@ def semi_automatic():
         data_delete = json.dumps({'commands': ['delete'], 'orgs': [org]})
         f = urllib.request.urlopen(request, data_delete.encode('utf-8'))
         print(f.read().decode('utf-8'))
+
+    # test to commit same cidr twice
+    org = copy.deepcopy(ORG_TEMPLATE)
+    org['networks'] = [{'address': '192.0.0.1',
+                        'annotations': [],
+                        'comment':'one'},
+                       {'address': '192.0.0.1',
+                        'annotations': [],
+                        'comment':'two'}]
+    data = json.dumps({
+        'commands':  ['create'],
+        'orgs': [org]
+        })
+
+    f = urllib.request.urlopen(request, data.encode('utf-8'))
+    result = f.read().decode('utf-8')
+    new_org_id = json.loads(result)[0][1]
+    print(result)
 
 
 if __name__ == '__main__':
