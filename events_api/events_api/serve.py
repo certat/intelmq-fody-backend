@@ -139,7 +139,7 @@ def __rollback_transaction():
     eventdb_conn.rollback()
 
 
-QUERY_EVENT_SUBQUERY = {
+QUERY_EVENT_SUBQUERY_INITIAL = {
     # queryname: ['sqlstatement', 'description', 'label', 'Expected-Type']
     'id': {
         'sql': 'id = %s',
@@ -526,6 +526,7 @@ def setup(api):
 
     # assemble all possible subqueries
     global QUERY_EVENT_SUBQUERY
+    QUERY_EVENT_SUBQUERY = QUERY_EVENT_SUBQUERY_INITIAL
     if QUERY_JOIN_MAILGEN_TABLES:
         QUERY_EVENT_SUBQUERY.update(QUERY_EVENT_SUBQUERY_MAILGEN)
 
