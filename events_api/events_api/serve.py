@@ -3,7 +3,7 @@
 
 Requires hug (http://www.hug.rest/)
 
-Copyright (C) 2017 by Bundesamt für Sicherheit in der Informationstechnik
+Copyright (C) 2017-2020 by Bundesamt für Sicherheit in der Informationstechnik
 
 Software engineering by Intevation GmbH
 
@@ -21,7 +21,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 Author(s):
-    * Bernhard E. Reiter <bernhard@intevation.de>
+    * Bernhard E. Reiter <bernhard.reiter@intevation.de>
+    * Bernhard Herzog <bernhard.herzog@intevation.de>
     * Dustin Demuth <dustin.demuth@intevation.de>
 
 TODO:
@@ -29,7 +30,6 @@ TODO:
       OR-Queries can be introduced later.
 
 """
-
 import json
 import logging
 import os
@@ -142,7 +142,7 @@ def __rollback_transaction():
 QUERY_EVENT_SUBQUERY = {
     # queryname: ['sqlstatement', 'description', 'label', 'Expected-Type']
     'id': {
-        'sql': 'id = %s',
+        'sql': 'events.id = %s',
         'description': 'Query for an Event matching this ID.',
         'label': 'EventID',
         'exp_type': 'integer'
@@ -337,9 +337,22 @@ QUERY_EVENT_SUBQUERY = {
     },
 }
 
+QUERY_EVENT_SUBQUERY_MAILGEN = {
+    # queries that need the intelmq-cb-mailgen extra tables
+    # queryname: ['sqlstatement', 'description', 'label', 'Expected-Type']
+    'recipient_group': {
+        'sql': 'json_object(aggregate_identifier) ->> \'recipient_group\''
+               'ILIKE %s',
+        'description': 'Value for recipient_group tag'
+                       'as set by the rule expert.',
+        'label': 'Recipient Group Tag contains',
+        'exp_type': 'string',
+    },
+}
+
 
 def query_get_subquery(q: str):
-    """ Return the query-Statement from the QUERY_EVENT_SUBQUERY
+    """Return the query-Statement from the QUERY_EVENT_SUBQUERY
 
     Basically this is a getter for the dict...
 
@@ -388,20 +401,48 @@ def query_build_query(params):
     return queries
 
 
+def _join_mailgen_tables(querystring: str) -> str:
+    """Change query string to join extra mailgen tables, if they exist.
+
+    * Add JOIN commands.
+    * If all columns are selected, change the SELECT part as well
+      to add the mailgen tables as row_to_json entries starting with
+      `mailgen_`.
+    """
+    global QUERY_JOIN_MAILGEN_TABLES
+
+    if QUERY_JOIN_MAILGEN_TABLES:
+        # join tables similiar to tickets backend to allow more filters
+        querystring += " JOIN directives on directives.events_id = events.id "
+        querystring += " JOIN sent on sent.id = directives.sent_id "
+
+        if querystring.startswith("SELECT * "):
+            # querystring = "SELECT events.* " + querystring[len("SELECT * "):]
+            querystring = (
+                "SELECT events.*, "
+                + "row_to_json(directives.*) AS mailgen_directives, "
+                + "row_to_json(sent.*) AS mailgen_sent "
+                + querystring[len("SELECT * "):])
+
+    return querystring
+
+
 def query_prepare_export(q):
-    """ Prepares a Query-string in order to Export Everything from the DB
+    """Prepares a query-string in order to export everything from the DB.
 
     Args:
-        q: An array of Tuples created with query_build_query
+        q: An array of tuples created with query_build_query.
 
-    Returns: A Tuple consisting of a query string and an array of parameters.
+    Returns: A tuple consisting of a query string and an array of parameters.
 
     """
     q_string = "SELECT * FROM {table}".format(table=QUERY_TABLE_NAME)
-    params = []
+    q_string = _join_mailgen_tables(q_string)
+
     # now iterate over q (which had to be created with query_build_query
     # previously) and should be a list of tuples and concatenate
     # the resulting query and a list of query parameters.
+    params = []
     counter = 0
     for subquerytuple in q:
         if counter > 0:
@@ -411,6 +452,7 @@ def query_prepare_export(q):
             q_string = q_string + " WHERE " + subquerytuple[0]
             params.extend((subquerytuple[1], ) * subquerytuple[0].count('%s'))
         counter += 1
+
     return q_string, params
 
 
@@ -424,14 +466,16 @@ def query_prepare_stats(q, interval='day'):
     Returns: A tuple consisting of a query string and an array of parameters.
 
     """
-
     if interval not in ('month', 'week', 'day', 'hour'):
         raise ValueError
 
     trunc = "date_trunc('%s', \"time.source\")" % (interval,)
 
-    q_string = """SELECT {trunc}, count(*) FROM {table}
+    # The `DISTINCT` makes sure each event is counted only once in case
+    # several directives for the same event were joined
+    q_string = """SELECT {trunc}, count(DISTINCT events.id) FROM {table}
                """.format(trunc=trunc, table=QUERY_TABLE_NAME)
+    q_string = _join_mailgen_tables(q_string)
 
     params = []
     # now iterate over q (which had to be created with query_build_query
@@ -490,11 +534,38 @@ def setup(api):
     open_db_connection(config["libpg conninfo"])
     log.debug("Initialised DB connection for events_api.")
 
-    global QUERY_EVENT_SUBQUERY
-    QUERY_EVENT_SUBQUERY.update(config.get('subqueries', {}))
-
     global QUERY_TABLE_NAME
     QUERY_TABLE_NAME = config.get('database table', 'events')
+
+    global QUERY_JOIN_MAILGEN_TABLES
+    QUERY_JOIN_MAILGEN_TABLES = _db_has_mailgen_tables()
+
+    # assemble all possible subqueries
+    global QUERY_EVENT_SUBQUERY
+    if QUERY_JOIN_MAILGEN_TABLES:
+        QUERY_EVENT_SUBQUERY.update(QUERY_EVENT_SUBQUERY_MAILGEN)
+
+    # it is fine to add the configured subqueries unconditionally
+    # as the operator of the system knows if this is intelmq-cb-mailgen or not
+    QUERY_EVENT_SUBQUERY.update(config.get('subqueries', {}))
+
+
+def _db_has_mailgen_tables():
+    """Query the database to check if the mailgen tables exist."""
+    global eventdb_conn
+
+    # psycopgy2.4 does not offer 'with' for cursor()
+    # FUTURE: use with
+    cur = eventdb_conn.cursor(cursor_factory=RealDictCursor)
+
+    #  tables `directives` and `sent` go together, so we check only one of them
+    cur.execute("SELECT to_regclass('public.directives')")
+    # this should always work if the connection to the db is okay
+    if cur.fetchone()['to_regclass'] == 'directives':
+        log.debug("Found intelmq-cb-mailgen table `directives`.")
+        return True
+    else:
+        return False
 
 
 @hug.get(ENDPOINT_PREFIX, examples="id=1")
@@ -520,12 +591,17 @@ def getEvent(response, id: int=None):
     prep = query_prepare_export(querylist)
 
     try:
-        return query(prep)
+        rows = query(prep)
     except psycopg2.Error as e:
         log.error(e)
         __rollback_transaction()
         response.status = HTTP_INTERNAL_SERVER_ERROR
         return {"error": "The query could not be processed."}
+
+    for row in rows:
+        change_notification_interval_to_int(row)
+
+    return rows
 
 
 @hug.get(ENDPOINT_PREFIX + '/subqueries')
@@ -539,6 +615,24 @@ def showSubqueries():
             del(v['sql'])
 
     return subquery_copy
+
+
+def change_notification_interval_to_int(result_row):
+    """Change timedelta to seconds to prepare for hug's serialisation.
+
+    Mutates dict in place for hard coded element `notification_interval`.
+    (The hardcoding should make this faster, as it is envisioned
+    to be used in a loop.)
+
+    Solution taken from module `tickets_api`.
+
+    Hug v2.2.0 cannot serialize datetime.timedelta objects.
+    Therefor we need to do it on our own... until we FUTURE have v2.3.0
+    See: https://github.com/timothycrosley/hug/issues/468
+    """
+    td = result_row.get("notification_interval")
+    if td and isinstance(td, datetime.timedelta):
+        result_row["notification_interval"] = td.total_seconds()
 
 
 @hug.get(ENDPOINT_PREFIX + '/search',
@@ -586,13 +680,13 @@ def search(response, **params):
     for row in rows:
         # remove None entries from the resulting dict
         event = {k: v for k, v in row.items() if v is not None}
+        change_notification_interval_to_int(event)
         events.append(event)
     return events
 
 
 @hug.get(ENDPOINT_PREFIX + '/stats',
          examples="malware-name_is=nymaim&timeres=day")
-# @hug.post(ENDPOINT_PREFIX + '/export')
 def stats(response, **params):
     """Return distribution of events for query parameters.
 
@@ -710,46 +804,6 @@ def stats(response, **params):
         return {"error": "Something went wrong."}
 
     return {'timeres': timeres, 'total': totalcount, 'results': results}
-
-
-@hug.get(ENDPOINT_PREFIX + '/export',
-         examples="time-observation_after=2017-03-01"
-                  "&time-observation_before=2017-03-01")
-# @hug.post(ENDPOINT_PREFIX + '/export')
-def export(response, **params):
-    """ This interface exports all events matching the query parameters
-
-    Args:
-        response: A HUG response object...
-        **params: Queries from QUERY_EVENT_SUBQUERY
-
-    Returns: If existing all events of the EventDB matching the query
-
-    """
-    for param in params:
-        # Test if the parameters are sane....
-        try:
-            query_get_subquery(param)
-        except ValueError:
-            response.status = HTTP_BAD_REQUEST
-            return {"error":
-                    "At least one of the queryparameters is not allowed"}
-
-    if not params:
-        response.status = HTTP_BAD_REQUEST
-        return {"error": "Queries without parameters are not supported"}
-
-    querylist = query_build_query(params)
-
-    prep = query_prepare_export(querylist)
-
-    try:
-        return query(prep)
-    except psycopg2.Error as e:
-        log.error(e)
-        __rollback_transaction()
-        response.status = HTTP_INTERNAL_SERVER_ERROR
-        return {"error": "The query could not be processed."}
 
 
 def main():

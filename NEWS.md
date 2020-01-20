@@ -1,5 +1,53 @@
-## 0.6.2 to 0.6.3 (unreleased)
-**TODO**
+## 0.7.1 to 0.7.2 (unreleased)
+**todo**
+
+## 0.7.0 to 0.7.1
+
+ * Events: Fix `./stats?` to count events only once in case of
+   `intelmq-cb-mailgen` setups. Note that several entries can be returned
+   with the corresponding `./search?` call. See usage hint for the reason.
+
+
+## 0.6.4 to 0.7.0
+
+ * Tickets:
+   * Change default parameters for `./stats?` to include the full last day
+     (based on what is the timezone of the database.)
+   * Cleanup code: Remove unused and broken `?id=` ability, change
+     `/?ticketnumber=` ability to return mailgen tables like `events/search`.
+
+ * Events:
+   * Change `./search?` to return the columns from `mailgen_directives` and
+     `mailgen_sent` tables as JSON values for easier handling in clients.
+   * Remove `./export?`, as too similar to `./search?` and assumed unused.
+   * Fix subquery for "EventID" (broken since 0.6.4).
+   * Fix support for hug v==2.2.0 in three endpoints.
+
+
+## 0.6.3.1 to 0.6.4
+
+ * Events:
+   * Enhance endpoints `./search?`, `./export?` to allow searching by
+     columns from joined `directives` and `sent` tables for symmetry with the
+     tickets backend. Add example for searching for `recipient_group` in
+     `aggregate_identifier`.
+
+ * Contactdb:
+   * Enhance endpoint `./annotation/search?tag=` to additionally search for
+     email tags and return organisations with those email addresses.
+
+### Upgrade
+ * Optional: Add an index for "`recipient_group` to directives (2019-10)", see
+   https://github.com/Intevation/intelmq-mailgen/blob/master/sql/updates.txt
+
+
+## 0.6.3 to 0.6.3.1
+
+ * Contactdb:
+   * Fix handling of email tags, by returing the correct default tags.
+
+
+## 0.6.2 to 0.6.3
 
  * Contactdb:
   * Disallows creating CIDRs or FQDNs with the same value in a single contact;
@@ -7,6 +55,10 @@
  * Events:
    * Additional configuration parameter `database table` to set the
      table name of the events table. Default is `events`.
+ * Contacts: Add handling of email tags.
+
+### Upgrade
+ *  Requirements: intelmq-certbund-contact>=0.9.4 on the db server.
 
 
 ## 0.6.1 to 0.6.2
@@ -32,7 +84,7 @@
    * Fixes search by email address so it filters out duplicates.
    * Adds `tools/import_manual_contacts.py` to import manual contacts
      from a .csv file via TLS.
-   * Adds sorting to some attribute list when serving an org. Attributes
+   * Adds sorting to some attribute lists when serving an org. Attributes
      sorted are contacts, asns, networks, fqdns, national_certs and tags.
 
 

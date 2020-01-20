@@ -2,12 +2,19 @@ from distutils.core import setup
 
 setup(
     name='intelmq-fody-backend',
-    version='0.6.3.dev0',
-    packages=['tickets_api.tickets_api', 'events_api.events_api', 'contactdb_api.contactdb_api',
-              'checkticket_api.checkticket_api', 'intelmq_fody_backend'],
+    # version shall be compatible with PEP440 and as close to
+    # Semantic Versioning 2.0.0 as we can, to be similiar to fody's versioning
+    version='0.7.2.dev0',
+    packages=[
+        'checkticket_api.checkticket_api',
+        'contactdb_api.contactdb_api',
+        'events_api.events_api',
+        'intelmq_fody_backend',
+        'tickets_api.tickets_api',
+        ],
     url='',
     license='AGPLv3',
-    author='Dustin Demuth',
-    author_email='dustin@intevation.de',
+    author='Intevation GmbH',
+    author_email='info@intevation.de',
     description=''
 )
